@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spite"
+version = "0.1.0"
+description = "Scattering Parameter Inspection Tool for Engineers"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Anthony Jeongseok Lee"}]
+requires-python = ">=3.10"
+dependencies = ["numpy", "matplotlib"]
+
