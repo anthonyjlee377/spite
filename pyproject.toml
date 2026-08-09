@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spite"
-version = "0.1.0"
+version = "0.1.1"
 description = "Scattering Parameter Inspection Tool for Engineers"
 readme = "README.md"
-license = {text = "MIT"}
+license = "0BSD"
 authors = [{name = "Anthony Jeongseok Lee"}]
 requires-python = ">=3.10"
 dependencies = ["numpy", "matplotlib"]
