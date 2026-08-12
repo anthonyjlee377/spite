@@ -3,6 +3,8 @@
 ## [0.1.1] - 2026-08-13
 ### Fixed
 - Added missing `import os` in `__init__.py`
+- Added changelog and reference
+- Updated license
   
 ## [0.1.0] - 2026-08-06
 ### Added
