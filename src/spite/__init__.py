@@ -3,7 +3,7 @@
 #================================================================
 import numpy as np
 import matplotlib.pyplot as plt
-
+import os
 
 #================================================================
 # Matrix format check and conversions
@@ -320,7 +320,7 @@ DEFAULT_HEIGHT = 64
 def make_bitmap(string_layout):
     """Converts a visual text block into a clean binary 2D NumPy array."""
     lines = [line.strip() for line in string_layout.strip().split('\n')]
-    # Convert '#' to 1 and anything else (like '.') to 0
+    # Convert 'E' to 1 and anything else (like '.') to 0
     return np.array([[0 if char == 'E' else 1 for char in line] for line in lines])
 
 SYM2P_R_SERIES = make_bitmap("""
