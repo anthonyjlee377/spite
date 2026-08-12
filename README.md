@@ -69,7 +69,7 @@ f = np.linspace(0.1, 4e9, 100)  # frequency sweep
 # Zc = sqrt(Z0*R) is the quarter-wave matching condition
 matching_network = (
     sp.net2p_tline_series(f=f, f0=1e9, EL_deg=90, Zc=np.sqrt(50 * 75))
-    @ sp.net1p_R(f=f, R=75)  # Terminate the network with a 75-ohm load
+    @ sp.net1p_R(f=f, R=75)  # terminates the network with a 75-ohm load
 )
 
 matching_network.plot_schematic()  # horizontal stack of SYM2P_TLINE_SERIES + SYM1P_R
@@ -123,7 +123,7 @@ SPITE is released under the [0BSD License](https://opensource.org/license/0bsd)
 - Attribution is appreciated but not required.
 - The software comes as is, with no warranty.
 
-A bibtex is provided below for those who would like to use it nonetheless:
+A bibtex is provided below for those who would like to use it:
 
 ```bibtex
 @software{spite,
