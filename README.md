@@ -22,6 +22,8 @@ Python operators are used for 1-port and 2-port network composition:
 
 - The entire library is in one file
 - Conversion between S, Z, Y, and ABCD parameters in both directions
+- Lumped R, L, C elements (1-port and 2-port)
+- Ideal transmission line elements (1-port and 2-port)
 - Schematics for 1-port and 2-port networks
 - `@` for cascading 2-port and 1-port networks
 - `**` for repeating a 2-port network 
