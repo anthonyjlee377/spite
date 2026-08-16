@@ -135,4 +135,8 @@ A bibtex is provided below for those who would like to use it:
 }
 ```
 
+## 7. Disclosure
+
+- SPITE is an independent project unaffiliated with any supervisor or institution.
+- Generative AI has been used in the development of its source code and initial documentation. The source code is subject to human review and validation. The single-file source code is intended to serve as learning material for students in future versions, and therefore requires a balance between computational efficiency and pedagogical clarity to reflect this goal.
 
