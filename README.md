@@ -8,8 +8,8 @@
 
 ## 1. Introduction
 
-SPITE is a lightweight single-file Python library for RF/microwave network analysis, 
-built so undergraduate students can learn microwave engineering and run simulations 
+SPITE is a lightweight single-file Python library for RF network analysis, 
+built so undergraduate students can learn the basics of RF/microwave engineering and run simulations 
 outside of class or internships without needing expensive, license-gated software.
 
 SPITE is built around the `Network` class, which represents RF networks using 
@@ -30,7 +30,7 @@ Python operators are used for 1-port and 2-port network composition:
 - Linear, dB, and Smith chart plots for S, Z, and Y parameters
 - Time-domain gating
 - Touchstone file import and export
-- Very important functions such as `esqueleto()` and `merendola()` (for reasons beyond microwave engineering)
+- Very important functions such as `esqueleto()` and `merendola()` (for reasons beyond RF engineering)
 
 ## 3. Limitations
 
@@ -50,6 +50,13 @@ SPITE depends on NumPy and Matplotlib. Nothing else.
 ```bash
 pip install spite
 ```
+
+In a notebooke environment, run the following cell to install SPITE:
+
+```bash
+!pip install spite -q  # -q is optional
+```
+
 Then start your Python script or notebook with: 
 
 ```python 
