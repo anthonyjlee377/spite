@@ -107,7 +107,7 @@ Resizes a bitmap array to a target pixel height, preserving aspect ratio.
 
 ### `Network2Port(Network)`
 -Adds the **`ABCD`** property (`S_to_ABCD(self.S, self.Z0)`), 
--Shortcut properties: **`S11`, `S12`, `S21`, `S22`**, **`Z11`–`Z22`**, **`Y11`–`Y22`** 
+-Shortcut properties: Matrix entries for S, Z, and Y parameters such as **`S11`**, **`Z11`**, **`Y11`** etc.
 -Each shortcut property optionally takes `f_eval=None`.
 
 ### Operators
