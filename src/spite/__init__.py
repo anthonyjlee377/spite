@@ -1633,7 +1633,7 @@ class Network:
         return port_list, is_raw_tuple
 
     def plot_lin(self, param="S", port_indices=(1, 1), cmap="plasma", ax=None):
-        """Plots parameter magnitude in dB vs frequency."""
+        """Plots parameter magnitude vs frequency."""
         ports, is_raw_tuple = self._parse_ports(port_indices)
 
         if ax is None:
@@ -1652,8 +1652,8 @@ class Network:
                 c = color_map(norm(f[i]))
                 ax.plot(f[i:i+2] / 1e9, mag[i:i+2], color=c, lw=2)
 
-            ax.set_ylabel(f"|{label}| (dB)")
-            ax.set_title(f"Magnitude Response of {label} (dB)")
+            ax.set_ylabel(f"|{label}|")
+            ax.set_title(f"Magnitude Response of {label}")
 
             # Frequency Colorbar
             sm = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
@@ -1670,8 +1670,8 @@ class Network:
                 # One solid plot call per port pair (fast & clean)
                 ax.plot(f / 1e9, mag, color=STATIC_COLORS[idx], lw=2, label=label)
 
-            ax.set_ylabel(f"|{param}| (dB)")
-            ax.set_title(f"Magnitude Response ({param}-Parameters in dB)")
+            ax.set_ylabel(f"|{param}|")
+            ax.set_title(f"Magnitude Response ({param}-Parameters)")
             ax.legend(loc="upper right", frameon=True)
 
         ax.set_xlabel("Frequency (GHz)")
