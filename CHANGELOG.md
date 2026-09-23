@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2] 
+### Added
+- Plots for phase response and group delay
+
+### Fixed
+- Time and frequency units autoscale. Units used to be hardcoded to GHz and ns
+
 ## [0.1.1] - 2026-08-13
 ### Fixed
 - Added missing `import os` in `__init__.py`
