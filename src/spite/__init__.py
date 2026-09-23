@@ -1632,9 +1632,34 @@ class Network:
 
         return port_list, is_raw_tuple
 
+    def _freq_unit(self):
+        """Returns (divisor, unit_string) auto-scaled to this network's frequency range."""
+        f_max = self.f[-1]
+        if f_max >= 1e9:
+            return 1e9, "GHz"
+        elif f_max >= 1e6:
+            return 1e6, "MHz"
+        elif f_max >= 1e3:
+            return 1e3, "kHz"
+        else:
+            return 1.0, "Hz"
+
+    def _time_unit(self, t):
+        """Returns (divisor, unit_string) auto-scaled to a time array (in seconds)."""
+        t_max = np.max(np.abs(t)) #changed from self.f[-1] so we can also use it for group delay
+        if t_max < 1e-6:
+            return 1e-9, "ns"
+        elif t_max < 1e-3:
+            return 1e-6, "µs"
+        elif t_max < 1.0:
+            return 1e-3, "ms"
+        else:
+            return 1.0, "s"
+
     def plot_lin(self, param="S", port_indices=(1, 1), cmap="plasma", ax=None):
         """Plots parameter magnitude vs frequency."""
         ports, is_raw_tuple = self._parse_ports(port_indices)
+        f_div, f_unit = self._freq_unit()
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
@@ -1645,12 +1670,12 @@ class Network:
             f, val, label = self._prepare_plot_data(param=param, port_indices=p)
             mag = np.abs(val)
 
-            norm = plt.Normalize(vmin=f[0], vmax=f[-1])
+            norm = plt.Normalize(vmin=f[0] / f_div, vmax=f[-1] / f_div)
             color_map = plt.colormaps[cmap]
 
             for i in range(len(f) - 1):
-                c = color_map(norm(f[i]))
-                ax.plot(f[i:i+2] / 1e9, mag[i:i+2], color=c, lw=2)
+                c = color_map(norm(f[i] / f_div))
+                ax.plot(f[i:i+2] / f_div, mag[i:i+2], color=c, lw=2)
 
             ax.set_ylabel(f"|{label}|")
             ax.set_title(f"Magnitude Response of {label}")
@@ -1659,7 +1684,7 @@ class Network:
             sm = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
             sm.set_array([])
             cbar = plt.colorbar(sm, ax=ax)
-            cbar.set_label("Frequency (Hz)")
+            cbar.set_label(f"Frequency ({f_unit})", rotation=270, labelpad=15)
 
         else:
             # --- 2. ARRAY OF PORTS [(1,1), ...] -> STATIC COLORS ---
@@ -1668,13 +1693,13 @@ class Network:
                 mag = np.abs(val)
 
                 # One solid plot call per port pair (fast & clean)
-                ax.plot(f / 1e9, mag, color=STATIC_COLORS[idx], lw=2, label=label)
+                ax.plot(f / f_div, mag, color=STATIC_COLORS[idx], lw=2, label=label)
 
             ax.set_ylabel(f"|{param}|")
             ax.set_title(f"Magnitude Response ({param}-Parameters)")
             ax.legend(loc="upper right", frameon=True)
 
-        ax.set_xlabel("Frequency (GHz)")
+        ax.set_xlabel(f"Frequency ({f_unit})")
         ax.grid(True, linestyle="--", alpha=0.6)
 
         return ax
@@ -1682,6 +1707,7 @@ class Network:
     def plot_dB(self, floor=-40, param="S", port_indices=(1, 1), cmap="plasma", ax=None):
         """Plots parameter magnitude in dB vs frequency."""
         ports, is_raw_tuple = self._parse_ports(port_indices)
+        f_div, f_unit = self._freq_unit()
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
@@ -1692,15 +1718,21 @@ class Network:
             f, val, label = self._prepare_plot_data(param=param, port_indices=p)
             mag_db = 20 * np.log10(np.maximum(np.abs(val), 10**(floor / 20)))
 
-            norm = plt.Normalize(vmin=f[0], vmax=f[-1])
+            norm = plt.Normalize(vmin=f[0] / f_div, vmax=f[-1] / f_div)
             color_map = plt.colormaps[cmap]
 
             for i in range(len(f) - 1):
-                c = color_map(norm(f[i]))
-                ax.plot(f[i:i+2] / 1e9, mag_db[i:i+2], color=c, lw=2)
+                c = color_map(norm(f[i] / f_div))
+                ax.plot(f[i:i+2] / f_div, mag_db[i:i+2], color=c, lw=2)
 
             ax.set_ylabel(f"|{label}| (dB)")
             ax.set_title(f"Magnitude Response of {label} (dB)")
+
+            # Frequency Colorbar
+            sm = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax)
+            cbar.set_label(f"Frequency ({f_unit})", rotation=270, labelpad=15)
 
         else:
             # --- 2. ARRAY OF PORTS [(1,1), ...] -> STATIC COLORS ---
@@ -1709,13 +1741,122 @@ class Network:
                 mag_db = 20 * np.log10(np.maximum(np.abs(val), 10**(floor / 20)))
 
                 # One solid plot call per port pair (fast & clean)
-                ax.plot(f / 1e9, mag_db, color=STATIC_COLORS[idx], lw=2, label=label)
+                ax.plot(f / f_div, mag_db, color=STATIC_COLORS[idx], lw=2, label=label)
 
             ax.set_ylabel(f"|{param}| (dB)")
             ax.set_title(f"Magnitude Response ({param}-Parameters in dB)")
             ax.legend(loc="upper right", frameon=True)
 
-        ax.set_xlabel("Frequency (GHz)")
+        ax.set_xlabel(f"Frequency ({f_unit})")
+        ax.grid(True, linestyle="--", alpha=0.6)
+
+        return ax
+
+    def plot_phase(self, param="S", port_indices=(1, 1), deg=True, unwrap=False, cmap="plasma", ax=None):
+        """Plots parameter phase vs frequency."""
+        ports, is_raw_tuple = self._parse_ports(port_indices)
+        f_div, f_unit = self._freq_unit()
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+        unit_label = "°" if deg else "rad"
+
+        def _get_phase(val):
+            phase = np.angle(val, deg=deg)
+            if unwrap:
+                # np.unwrap expects radians, so convert, unwrap, convert back
+                phase_rad = np.angle(val, deg=False)
+                phase_rad = np.unwrap(phase_rad)
+                phase = np.degrees(phase_rad) if deg else phase_rad
+            return phase
+
+        if is_raw_tuple:
+            p = ports[0]
+            f, val, label = self._prepare_plot_data(param=param, port_indices=p)
+            phase = _get_phase(val)
+
+            norm = plt.Normalize(vmin=f[0] / f_div, vmax=f[-1] / f_div)
+            color_map = plt.colormaps[cmap]
+
+            for i in range(len(f) - 1):
+                c = color_map(norm(f[i] / f_div))
+                ax.plot(f[i:i+2] / f_div, phase[i:i+2], color=c, lw=2)
+
+            ax.set_ylabel(f"∠{label} ({unit_label})")
+            ax.set_title(f"Phase Response of {label}")
+
+            sm = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax)
+            cbar.set_label(f"Frequency ({f_unit})", rotation=270, labelpad=15)
+
+        else:
+            for idx, p in enumerate(ports):
+                f, val, label = self._prepare_plot_data(param=param, port_indices=p)
+                phase = _get_phase(val)
+
+                ax.plot(f / f_div, phase, color=STATIC_COLORS[idx], lw=2, label=label)
+
+            ax.set_ylabel(f"∠{param} ({unit_label})")
+            ax.set_title(f"Phase Response ({param}-Parameters)")
+            ax.legend(loc="upper right", frameon=True)
+
+        ax.set_xlabel(f"Frequency ({f_unit})")
+        ax.grid(True, linestyle="--", alpha=0.6)
+
+        return ax
+
+    def plot_group_delay(self, param="S", port_indices=(1, 1), cmap="plasma", ax=None):
+        """Plots group delay (-d(phase)/dω) vs frequency in nanoseconds."""
+        ports, is_raw_tuple = self._parse_ports(port_indices)
+        f_div, f_unit = self._freq_unit()
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+        def _get_group_delay(f, val):
+            # unwrap phase in radians first (group delay always needs unwrapped phase)
+            phase_rad = np.unwrap(np.angle(val, deg=False))
+            omega = 2 * np.pi * f
+            # numerical derivative: use central differences for interior points
+            gd = -np.gradient(phase_rad, omega)  # seconds
+            return gd  
+
+        
+
+        if is_raw_tuple:
+            p = ports[0]
+            f, val, label = self._prepare_plot_data(param=param, port_indices=p)
+            gd = _get_group_delay(f, val)
+            t_div, t_unit = self._time_unit(gd)
+            norm = plt.Normalize(vmin=f[0] / f_div, vmax=f[-1] / f_div)
+            color_map = plt.colormaps[cmap]
+
+            for i in range(len(f) - 1):
+                c = color_map(norm(f[i] / f_div))
+                ax.plot(f[i:i+2] / f_div, gd[i:i+2] / t_div, color=c, lw=2)
+
+            ax.set_ylabel(f"Group Delay ({t_unit})")
+            ax.set_title(f"Group Delay of {label}")
+
+            sm = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax)
+            cbar.set_label(f"Frequency ({f_unit})", rotation=270, labelpad=15)
+
+        else:
+            for idx, p in enumerate(ports):
+                f, val, label = self._prepare_plot_data(param=param, port_indices=p)
+                gd = _get_group_delay(f, val)
+                t_div, t_unit = self._time_unit(gd)
+                ax.plot(f / f_div, gd / t_div, color=STATIC_COLORS[idx], lw=2, label=label)
+
+            ax.set_ylabel(f"Group Delay ({t_unit})")
+            ax.set_title(f"Group Delay ({param}-Parameters)")
+            ax.legend(loc="upper right", frameon=True)
+
+        ax.set_xlabel(f"Frequency ({f_unit})")
         ax.grid(True, linestyle="--", alpha=0.6)
 
         return ax
@@ -1786,6 +1927,7 @@ class Network:
 
         ports, is_raw_tuple = self._parse_ports(port_indices)
         self._draw_smith_chart(ax=ax, r_vals=[0, 0.2, 0.5, 1, 2, 5, 20], chart_type=chart_type)
+        f_div, f_unit = self._freq_unit()
 
         if is_raw_tuple:
             cmaps = [cmap]
@@ -1813,14 +1955,14 @@ class Network:
             display_cmap = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
                 "smith_freq_cbar", plt.get_cmap(cbar_cmap_name)(np.linspace(0, frac, 256))
             )
-            norm = plt.Normalize(vmin=self.f[0] / 1e9, vmax=self.f[-1] / 1e9)
+            norm = plt.Normalize(vmin=self.f[0] / f_div, vmax=self.f[-1] / f_div)
             sm = plt.cm.ScalarMappable(cmap=display_cmap, norm=norm)
             sm.set_array([])
             cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
 
             is_outermost = (idx == 0)
             if is_outermost:
-                cbar.set_label("Frequency (GHz)", rotation=270, labelpad=15)
+                cbar.set_label(f"Frequency ({f_unit})", rotation=270, labelpad=15)
             else:
                 cbar.ax.tick_params(labelright=False, right=False)
 
@@ -1945,6 +2087,8 @@ class Network:
         return self.__class__(f_out, S_out, Z0=self.Z0)
 
 
+
+
     def plot_time_domain(self, port_indices=(1, 1), cmap="plasma_r", ax=None):
         """Plots the time-domain impulse response (|IFFT(S)|) for one or more port pairs.
         Useful for visually identifying reflections before calling gate()."""
@@ -1954,6 +2098,7 @@ class Network:
             fig, ax = plt.subplots(figsize=(8, 5))
 
         t, fs = self._time_axis()
+        t_div, t_unit = self._time_unit(t)
 
         if is_raw_tuple:
             # --- 1. SINGLE RAW TUPLE (1, 1) -> Plasma GRADIENT ---
@@ -1961,14 +2106,14 @@ class Network:
             s_t = np.fft.ifft(self.S[:, i, j])
             label = f"$S_{{{ports[0][0]}{ports[0][1]}}}$"
             mag = np.abs(s_t)
-            t_ns = t * 1e9
+            t_scaled = t / t_div
 
-            norm = plt.Normalize(vmin=t[0], vmax=t[-1])
+            norm = plt.Normalize(vmin=t[0] / t_div, vmax=t[-1] / t_div)
             color_map = plt.colormaps[cmap]
 
             for k in range(len(t) - 1):
-                c = color_map(norm(t[k]))
-                ax.plot(t_ns[k:k+2], mag[k:k+2], color=c, lw=2)
+                c = color_map(norm(t[k] / t_div))
+                ax.plot(t_scaled[k:k+2], mag[k:k+2], color=c, lw=2)
 
             ax.set_ylabel(f"|{label}| (Impulse Response)")
             ax.set_title(f"Time-Domain Response of {label}")
@@ -1987,13 +2132,13 @@ class Network:
                 label = f"$S_{{{ports[0][0]}{ports[0][1]}}}$"
                 mag = np.abs(s_t)
 
-                ax.plot(t * 1e9, mag, color=STATIC_COLORS[idx], lw=2, label=label)
+                ax.plot(t / t_div, mag, color=STATIC_COLORS[idx], lw=2, label=label)
 
             ax.set_ylabel("|Impulse Response|")
             ax.set_title("Time-Domain Response")
             ax.legend(loc="upper right", frameon=True)
 
-        ax.set_xlabel("Time (ns)")
+        ax.set_xlabel(f"Time ({t_unit})")
         ax.grid(True, linestyle="--", alpha=0.6)
 
         return ax
