@@ -1807,8 +1807,12 @@ class Network:
 
         return ax
 
-    def plot_group_delay(self, param="S", port_indices=(1, 1), cmap="plasma", ax=None):
-        """Plots group delay (-d(phase)/dω) vs frequency in nanoseconds."""
+    def plot_group_delay(self, port_indices=None, cmap="plasma", ax=None):
+        """Plots group delay (-d(phase)/dω) vs frequency"""
+        param = "S" # group delay is obtained from S parameters
+        if port_indices is None:
+            port_indices = (2, 1) if self.Nports >= 2 else (1, 1)
+            
         ports, is_raw_tuple = self._parse_ports(port_indices)
         f_div, f_unit = self._freq_unit()
 
