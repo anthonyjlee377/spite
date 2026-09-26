@@ -27,7 +27,8 @@ Python operators are used for 1-port and 2-port network composition:
 - Schematics for 1-port and 2-port networks
 - `@` for cascading 2-port and 1-port networks
 - `**` for repeating a 2-port network 
-- Linear, dB, and Smith chart plots for S, Z, and Y parameters
+- Linear, dB, phase, and Smith chart plots for S, Z, and Y parameters
+- Group delay
 - Time-domain gating
 - Touchstone file import and export
 - Very important functions such as `esqueleto()` and `merendola()` (for reasons beyond RF engineering)
