@@ -1,5 +1,5 @@
 
-# SPITE 0.1.1
+# SPITE 0.1.2
 ### Scattering Parameter Inspection Tool for Engineers
 
 *"The secret ingredient is SPITE :D"*
@@ -22,9 +22,8 @@ Python operators are used for 1-port and 2-port network composition:
 
 - The entire library is in one file
 - Conversion between S, Z, Y, and ABCD parameters in both directions
-- Lumped R, L, C elements (1-port and 2-port)
-- Ideal transmission line elements (1-port and 2-port)
-- Schematics for 1-port and 2-port networks
+- Lumped R, L, C and transmission line elements (2-port and 1-port)
+- Schematics for 2-port and 1-port networks
 - `@` for cascading 2-port and 1-port networks
 - `**` for repeating a 2-port network 
 - Linear, dB, phase, and Smith chart plots for S, Z, and Y parameters
