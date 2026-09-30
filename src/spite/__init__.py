@@ -41,15 +41,42 @@ def check_network(f, S, n=None):
     return f, S
 
 
+def ZY_to_propagation(Z, Y):
+    Z = np.asarray(Z, dtype=complex)
+    Y = np.asarray(Y, dtype=complex)
+    gamma = np.sqrt(Z * Y)
+    Zc = np.sqrt(Z / Y)
+    return gamma, Zc
+
+def RLGC_to_propagation(R, L, G, C, f):
+    f = np.asarray(f, dtype=float)
+    w = 2 * np.pi * f
+    R = _prep_component(R, f, "R")
+    L = _prep_component(L, f, "L")
+    G = _prep_component(G, f, "G")
+    C = _prep_component(C, f, "C")
+    Z = R + 1j * w * L
+    Y = G + 1j * w * C
+    return ZY_to_propagation(Z, Y)
+
+
+def _broadcast_array(val, N):
+    arr = np.atleast_1d(np.asarray(val)).astype(complex)
+    if arr.size == 1:
+        return np.full(N, arr[0])
+    elif arr.size == N:
+        return arr
+    else:
+        raise ValueError(f"Expected scalar or {N}-element array, got size {arr.size}.")
+
+
 def S_to_Z(S, Z0=50):
     """Converts general (Nf, N, N) S-parameters to Z-parameters supporting multi-Z0 arrays."""
     S = check(S)
     Nf, N, _ = S.shape
 
     # Ensure Z0 is a 1D array of length N
-    Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-    if len(Z0_arr) == 1:
-        Z0_arr = np.full(N, Z0_arr[0])
+    Z0_arr = _broadcast_array(Z0, N)
 
     #------------------------------------------------------------
     # 1-Port Vectorized Speed Override
@@ -98,9 +125,7 @@ def Z_to_S(Z, Z0=50):
     Z = check(Z)
     Nf, N, _ = Z.shape
 
-    Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-    if len(Z0_arr) == 1:
-        Z0_arr = np.full(N, Z0_arr[0])
+    Z0_arr = _broadcast_array(Z0, N)
 
     #------------------------------------------------------------
     # 1-Port Vectorized Speed Override
@@ -153,9 +178,7 @@ def S_to_Y(S, Z0=50):
     S = check(S)
     Nf, N, _ = S.shape
 
-    Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-    if len(Z0_arr) == 1:
-        Z0_arr = np.full(N, Z0_arr[0])
+    Z0_arr = _broadcast_array(Z0, N)
     Y0_arr = 1.0 / Z0_arr
 
     #------------------------------------------------------------
@@ -203,9 +226,7 @@ def Y_to_S(Y, Z0=50):
     Y = check(Y)
     Nf, N, _ = Y.shape
 
-    Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-    if len(Z0_arr) == 1:
-        Z0_arr = np.full(N, Z0_arr[0])
+    Z0_arr = _broadcast_array(Z0, N)
 
     #------------------------------------------------------------
     # 1-Port Vectorized Speed Override
@@ -256,12 +277,10 @@ def Y_to_S(Y, Z0=50):
 def S_to_ABCD(S, Z0=50):
     """Converts a batch of 2-port S-parameters with shape (Nf, 2, 2) to ABCD parameters supporting multi-Z0 arrays."""
     S = check(S, n=2)
-    Nf = S.shape[0]
+    Nf, N, _ = S.shape
 
     # Handle Z0 array conversion [Z01, Z02]
-    Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-    if len(Z0_arr) == 1:
-        Z0_arr = np.full(2, Z0_arr[0])
+    Z0_arr = _broadcast_array(Z0, N)
     Z01, Z02 = Z0_arr[0], Z0_arr[1]
 
     S11 = S[:, 0, 0]
@@ -285,12 +304,10 @@ def S_to_ABCD(S, Z0=50):
 def ABCD_to_S(ABCD, Z0=50):
     """Converts a batch of 2-port ABCD parameters with shape (Nf, 2, 2) to S-parameters supporting multi-Z0 arrays."""
     ABCD = check(ABCD, n=2)
-    Nf = ABCD.shape[0]
+    Nf, N, _ = ABCD.shape
 
     # Handle Z0 array conversion [Z01, Z02]
-    Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-    if len(Z0_arr) == 1:
-        Z0_arr = np.full(2, Z0_arr[0])
+    Z0_arr = _broadcast_array(Z0, N)
     Z01, Z02 = Z0_arr[0], Z0_arr[1]
 
     A = ABCD[:, 0, 0]
@@ -1571,16 +1588,10 @@ class Network:
     def __init__(self, f, S, Z0=50, schematic=np.array([[0]])):
         self.f = np.asarray(f)
         self.S = np.asarray(S)
-        self.Nports = self.S.shape[1] # Automatically infer number of ports
+        self.Nf, self.Nports, _ = S.shape # Automatically infer number of ports
 
         # Normalize Z0 into a 1D array of length equal to the number of ports
-        Z0_arr = np.atleast_1d(np.asarray(Z0, dtype=float))
-        if len(Z0_arr) == 1:
-            self.Z0 = np.full(self.Nports, Z0_arr[0])
-        elif len(Z0_arr) == self.Nports:
-            self.Z0 = Z0_arr
-        else:
-            raise ValueError(f"Z0 length ({len(Z0_arr)}) must match the number of ports ({self.ports}).")
+        self.Z0 = _broadcast_array(Z0, self.Nports)
 
         # Handle default schematic (Black box square)
         if schematic is None:
@@ -2439,6 +2450,20 @@ def write_touchstone(filepath, network):
 # Basic components
 #================================================================
 
+def net2p_ZY(f, Z, Y, Z0=50.0, schematic=SYM2P_RLGC):
+    f = np.asarray(f, dtype=float)
+    Nf = f.size
+    Z0_arr = _broadcast_array(Z0, 2)
+    Z = np.broadcast_to(np.asarray(Z, dtype=complex), f.shape).copy()
+    Y = np.broadcast_to(np.asarray(Y, dtype=complex), f.shape).copy()
+    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
+    ABCD[:, 0, 0] = 1.0
+    ABCD[:, 0, 1] = Z
+    ABCD[:, 1, 0] = Y
+    ABCD[:, 1, 1] = 1.0 + Y * Z
+    return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=schematic)
+
+
 def _prep_component(val, f, name):
     """Convert R/L/C to a scalar float or an array matching f's shape."""
     val = np.asarray(val, dtype=float)
@@ -2453,54 +2478,14 @@ def _prep_component(val, f, name):
 
 
 def net2p_R_series(f, R, Z0=50.0):
-    """2-port network for an ideal series resistor. R may be a scalar or an array matching f."""
     f = np.asarray(f, dtype=float)
     R = _prep_component(R, f, "R")
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
-    Z = R  # frequency-independent unless R is passed as an array
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = Z
-    ABCD[:, 1, 0] = 0.0
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_R_SERIES)
-
+    return net2p_ZY(f, Z=R, Y=0.0, Z0=Z0, schematic=SYM2P_R_SERIES)
 
 def net2p_R_shunt(f, R, Z0=50.0):
-    """2-port network for an ideal shunt resistor (to ground). R may be a scalar or an array matching f."""
     f = np.asarray(f, dtype=float)
     R = _prep_component(R, f, "R")
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
-    Z = R
-    Y = 1.0 / Z
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = 0.0
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_R_SHUNT)
+    return net2p_ZY(f, Z=0.0, Y=1.0/R, Z0=Z0, schematic=SYM2P_R_SHUNT)
 
 
 def net1p_R(f, R, Z0=50.0):
@@ -2520,54 +2505,14 @@ def net1p_R(f, R, Z0=50.0):
 
 
 def net2p_L_series(f, L, Z0=50.0):
-    """2-port network for an ideal series inductor. L may be a scalar or an array matching f."""
     f = np.asarray(f, dtype=float)
     L = _prep_component(L, f, "L")
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
-    Z = 1j * 2.0 * np.pi * f * L
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = Z
-    ABCD[:, 1, 0] = 0.0
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_L_SERIES)
-
+    return net2p_ZY(f, Z=1j*2*np.pi*f*L, Y=0.0, Z0=Z0, schematic=SYM2P_L_SERIES)
 
 def net2p_L_shunt(f, L, Z0=50.0):
-    """2-port network for an ideal shunt inductor (to ground). L may be a scalar or an array matching f."""
     f = np.asarray(f, dtype=float)
     L = _prep_component(L, f, "L")
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
-    Z = 1j * 2.0 * np.pi * f * L
-    Y = 1.0 / Z
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = 0.0
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_L_SHUNT)
+    return net2p_ZY(f, Z=0.0, Y=1.0/(1j*2*np.pi*f*L), Z0=Z0, schematic=SYM2P_L_SHUNT)
 
 
 def net1p_L(f, L, Z0=50.0):
@@ -2587,54 +2532,15 @@ def net1p_L(f, L, Z0=50.0):
 
 
 def net2p_C_series(f, C, Z0=50.0):
-    """2-port network for an ideal series capacitor. C may be a scalar or an array matching f."""
     f = np.asarray(f, dtype=float)
     C = _prep_component(C, f, "C")
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
-    Z = 1.0 / (1j * 2.0 * np.pi * f * C)
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = Z
-    ABCD[:, 1, 0] = 0.0
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_C_SERIES)
-
+    return net2p_ZY(f, Z=1.0/(1j*2*np.pi*f*C), Y=0.0, Z0=Z0, schematic=SYM2P_C_SERIES)
 
 def net2p_C_shunt(f, C, Z0=50.0):
-    """2-port network for an ideal shunt capacitor (to ground). C may be a scalar or an array matching f."""
     f = np.asarray(f, dtype=float)
     C = _prep_component(C, f, "C")
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
+    return net2p_ZY(f, Z=0.0, Y=1j*2*np.pi*f*C, Z0=Z0, schematic=SYM2P_C_SHUNT)
 
-    Z = 1.0 / (1j * 2.0 * np.pi * f * C)
-    Y = 1.0 / Z
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = 0.0
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_C_SHUNT)
 
 
 def net1p_C(f, C, Z0=50.0):
@@ -2684,98 +2590,33 @@ def net2p_RLGC(f, R, L, G, C, Z0=50.0):
 
     return Network2Port(f, ABCD_to_S(ABCD, Z0), Z0=Z0, schematic=SYM2P_RLGC)
 
-def net2p_ZY(f, Z, Y, Z0=50.0):
-    """2-port network for a generic series impedance Z followed by a shunt admittance Y.
-    Z and Y may be complex, and may be scalars or arrays matching f."""
-    f = np.asarray(f, dtype=float)
-    Z = np.broadcast_to(np.asarray(Z, dtype=complex), f.shape).copy()
-    Y = np.broadcast_to(np.asarray(Y, dtype=complex), f.shape).copy()
 
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = Z
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0 + Y * Z
-
-    return Network2Port(f, ABCD_to_S(ABCD, Z0), Z0=Z0, schematic=SYM2P_RLGC)
 
 def net2p_tline_series(f, f0, EL_deg, Zc, Z0=50.0):
-    """2-port network for an ideal (lossless) transmission line segment."""
     f = np.asarray(f, dtype=float)
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
-    theta = np.radians(EL_deg) * (f / f0)  # electrical length at f, purely real (lossless)
-    cos_t = np.cos(theta)
-    sin_t = np.sin(theta)
-
-    Nf = f.size if f.ndim > 0 else 1
+    Nf = f.size
+    Z0_arr = _broadcast_array(Z0, 2)
+    theta = np.radians(EL_deg) * (f / f0)
     ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = cos_t
-    ABCD[:, 0, 1] = 1j * Zc * sin_t
-    ABCD[:, 1, 0] = 1j * sin_t / Zc
-    ABCD[:, 1, 1] = cos_t
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_TLINE_SERIES)
+    ABCD[:, 0, 0] = np.cos(theta); ABCD[:, 0, 1] = 1j * Zc * np.sin(theta)
+    ABCD[:, 1, 0] = 1j * np.sin(theta) / Zc; ABCD[:, 1, 1] = np.cos(theta)
+    return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=SYM2P_TLINE_SERIES)
 
 
 def net2p_tline_shunt_open(f, f0, EL_deg, Zc, Z0=50.0):
-    """2-port network: through-line with an ideal open-circuited stub shunted to ground."""
     f = np.asarray(f, dtype=float)
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
+    Z0_arr = _broadcast_array(Z0, 2)
     theta = np.radians(EL_deg) * (f / f0)
-    Zin_open = -1j * Zc / np.tan(theta)
-    Y = 1.0 / Zin_open
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = 0.0
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_TLINE_SHUNT_OPEN)
+    Y = np.tan(theta) / (-1j * Zc)
+    return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_OPEN)
 
 
 def net2p_tline_shunt_short(f, f0, EL_deg, Zc, Z0=50.0):
-    """2-port network: through-line with an ideal short-circuited stub shunted to ground."""
     f = np.asarray(f, dtype=float)
-    Z0_vec = np.atleast_1d(Z0).astype(float)
-    if Z0_vec.size == 1:
-        Z0_1 = Z0_2 = float(Z0_vec[0])
-    elif Z0_vec.size == 2:
-        Z0_1, Z0_2 = float(Z0_vec[0]), float(Z0_vec[1])
-    else:
-        raise ValueError("Z0 must be a scalar or a 2-element array for a 2-port network.")
-
+    Z0_arr = _broadcast_array(Z0, 2)
     theta = np.radians(EL_deg) * (f / f0)
-    Zin_short = 1j * Zc * np.tan(theta)
-    Y = 1.0 / Zin_short
-
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
-    ABCD[:, 0, 1] = 0.0
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0
-
-    S = ABCD_to_S(ABCD, np.array([Z0_1, Z0_2]))
-    return Network2Port(f, S, Z0=np.array([Z0_1, Z0_2]), schematic=SYM2P_TLINE_SHUNT_SHORT)
+    Y = 1.0 / (1j * Zc * np.tan(theta))
+    return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_SHORT)
 
 
 def net1p_tline_open(f, f0, EL_deg, Zc, Z0=50.0):
@@ -2807,6 +2648,55 @@ def net1p_tline_short(f, f0, EL_deg, Zc, Z0=50.0):
     S = np.zeros((Nf, 1, 1), dtype=complex)
     S[:, 0, 0] = S11
 
+    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_SHORT)
+
+
+def net2p_tline_lossy_series(f, gamma, length, Zc=50.0, Z0=50.0):
+    f = np.asarray(f, dtype=float)
+    Nf = f.size
+    Z0_arr = _broadcast_array(Z0, 2)
+    gl = np.asarray(gamma) * length
+    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
+    ABCD[:, 0, 0] = np.cosh(gl)
+    ABCD[:, 0, 1] = Zc * np.sinh(gl)
+    ABCD[:, 1, 0] = np.sinh(gl) / Zc
+    ABCD[:, 1, 1] = np.cosh(gl)
+    return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=SYM2P_TLINE_SERIES)
+
+def net2p_tline_lossy_shunt_open(f, gamma, length, Zc=50.0, Z0=50.0):
+    f = np.asarray(f, dtype=float)
+    Z0_arr = _broadcast_array(Z0, 2)
+    gl = np.asarray(gamma) * length
+    Y = np.tanh(gl) / Zc
+    return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_OPEN)
+
+def net2p_tline_lossy_shunt_short(f, gamma, length, Zc=50.0, Z0=50.0):
+    f = np.asarray(f, dtype=float)
+    Z0_arr = _broadcast_array(Z0, 2)
+    gl = np.asarray(gamma) * length
+    Y = 1.0 / (Zc * np.tanh(gl))
+    return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_SHORT)
+
+def net1p_tline_lossy_open(f, gamma, length, Zc=50.0, Z0=50.0):
+    f = np.asarray(f, dtype=float)
+    Nf = f.size
+    Z0_val = float(np.atleast_1d(Z0)[0])
+    gl = np.asarray(gamma) * length
+    Zin = Zc / np.tanh(gl)
+    S11 = (Zin - Z0_val) / (Zin + Z0_val)
+    S = np.zeros((Nf, 1, 1), dtype=complex)
+    S[:, 0, 0] = S11
+    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_OPEN)
+
+def net1p_tline_lossy_short(f, gamma, length, Zc=50.0, Z0=50.0):
+    f = np.asarray(f, dtype=float)
+    Nf = f.size
+    Z0_val = float(np.atleast_1d(Z0)[0])
+    gl = np.asarray(gamma) * length
+    Zin = Zc * np.tanh(gl)
+    S11 = (Zin - Z0_val) / (Zin + Z0_val)
+    S = np.zeros((Nf, 1, 1), dtype=complex)
+    S[:, 0, 0] = S11
     return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_SHORT)
 
 #================================================================
