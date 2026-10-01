@@ -50,13 +50,12 @@ def ZY_to_propagation(Z, Y):
 
 def RLGC_to_propagation(R, L, G, C, f):
     f = np.asarray(f, dtype=float)
-    w = 2 * np.pi * f
-    R = _prep_component(R, f, "R")
-    L = _prep_component(L, f, "L")
-    G = _prep_component(G, f, "G")
-    C = _prep_component(C, f, "C")
-    Z = R + 1j * w * L
-    Y = G + 1j * w * C
+    R = _prep_component(f, R, "R")
+    L = _prep_component(f, L, "L")
+    G = _prep_component( f, G,"G")
+    C = _prep_component(f, C, "C")
+    Z = R + 1j * 2 * np.pi * f * L
+    Y = G + 1j * 2 * np.pi * f * C
     return ZY_to_propagation(Z, Y)
 
 
@@ -944,6 +943,7 @@ EEEEEEEEEEEEEEEE................
 """)
 
 SYM2P_RLGC = np.hstack([SYM2P_R_SERIES, SYM2P_L_SERIES, SYM2P_R_SHUNT, SYM2P_C_SHUNT])
+SYM1P_RLC = np.hstack([SYM2P_R_SERIES, SYM2P_L_SERIES, SYM2P_C_SHUNT])
 
 SYM2P_TLINE_SERIES = make_bitmap("""
 ........................................
@@ -2449,114 +2449,60 @@ def write_touchstone(filepath, network):
 #================================================================
 # Basic components
 #================================================================
+def _prep_component(f, val, name):
+    arr = np.asarray(val, dtype=complex)  # era float
+    if arr.ndim == 0:
+        return np.full(f.shape, arr)
+    elif arr.shape == f.shape:
+        return arr
+    else:
+        raise ValueError(f"{name} must be scalar or match f.shape {f.shape}, got {arr.shape}")
 
 def net2p_ZY(f, Z, Y, Z0=50.0, schematic=SYM2P_RLGC):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Nf = f.size
     Z0_arr = _broadcast_array(Z0, 2)
     Z = np.broadcast_to(np.asarray(Z, dtype=complex), f.shape).copy()
     Y = np.broadcast_to(np.asarray(Y, dtype=complex), f.shape).copy()
     ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0
+    ABCD[:, 0, 0] = 1.0 + Y * Z
     ABCD[:, 0, 1] = Z
     ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0 + Y * Z
+    ABCD[:, 1, 1] = 1.0 
     return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=schematic)
 
 
-def _prep_component(val, f, name):
-    """Convert R/L/C to a scalar float or an array matching f's shape."""
-    val = np.asarray(val, dtype=float)
-    if val.ndim == 0:
-        return float(val)
-    if val.shape != f.shape:
-        raise ValueError(
-            f"{name} must be a scalar or an array with the same shape as f "
-            f"(got {name}.shape={val.shape}, f.shape={f.shape})."
-        )
-    return val
-
-
 def net2p_R_series(f, R, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    R = _prep_component(R, f, "R")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    R = _prep_component(f, R, "R")
     return net2p_ZY(f, Z=R, Y=0.0, Z0=Z0, schematic=SYM2P_R_SERIES)
 
 def net2p_R_shunt(f, R, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    R = _prep_component(R, f, "R")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    R = _prep_component(f, R, "R")
     return net2p_ZY(f, Z=0.0, Y=1.0/R, Z0=Z0, schematic=SYM2P_R_SHUNT)
 
 
-def net1p_R(f, R, Z0=50.0):
-    """1-port network for an ideal resistor termination. R may be a scalar or an array matching f."""
-    f = np.asarray(f, dtype=float)
-    R = _prep_component(R, f, "R")
-    Z0_val = float(np.atleast_1d(Z0).astype(float)[0])
-
-    Z = R
-    S11 = (Z - Z0_val) / (Z + Z0_val)
-
-    Nf = f.size if f.ndim > 0 else 1
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_R)
-
-
 def net2p_L_series(f, L, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    L = _prep_component(L, f, "L")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    L = _prep_component( f, L,"L")
     return net2p_ZY(f, Z=1j*2*np.pi*f*L, Y=0.0, Z0=Z0, schematic=SYM2P_L_SERIES)
 
 def net2p_L_shunt(f, L, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    L = _prep_component(L, f, "L")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    L = _prep_component(f, L, "L")
     return net2p_ZY(f, Z=0.0, Y=1.0/(1j*2*np.pi*f*L), Z0=Z0, schematic=SYM2P_L_SHUNT)
 
 
-def net1p_L(f, L, Z0=50.0):
-    """1-port network for an ideal inductor termination. L may be a scalar or an array matching f."""
-    f = np.asarray(f, dtype=float)
-    L = _prep_component(L, f, "L")
-    Z0_val = float(np.atleast_1d(Z0).astype(float)[0])
-
-    Z = 1j * 2.0 * np.pi * f * L
-    S11 = (Z - Z0_val) / (Z + Z0_val)
-
-    Nf = f.size if f.ndim > 0 else 1
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_L)
-
-
 def net2p_C_series(f, C, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    C = _prep_component(C, f, "C")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    C = _prep_component(f, C, "C")
     return net2p_ZY(f, Z=1.0/(1j*2*np.pi*f*C), Y=0.0, Z0=Z0, schematic=SYM2P_C_SERIES)
 
 def net2p_C_shunt(f, C, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    C = _prep_component(C, f, "C")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    C = _prep_component(f, C, "C")
     return net2p_ZY(f, Z=0.0, Y=1j*2*np.pi*f*C, Z0=Z0, schematic=SYM2P_C_SHUNT)
-
-
-
-def net1p_C(f, C, Z0=50.0):
-    """1-port network for an ideal capacitor termination. C may be a scalar or an array matching f."""
-    f = np.asarray(f, dtype=float)
-    C = _prep_component(C, f, "C")
-    Z0_val = float(np.atleast_1d(Z0).astype(float)[0])
-
-    Z = 1.0 / (1j * 2.0 * np.pi * f * C)
-    S11 = (Z - Z0_val) / (Z + Z0_val)
-
-    Nf = f.size if f.ndim > 0 else 1
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_C)
 
 
 def net2p_RLGC(f, R, L, G, C, Z0=50.0):
@@ -2571,29 +2517,21 @@ def net2p_RLGC(f, R, L, G, C, Z0=50.0):
     A real, physically uniform line segment has S11 == S22; this model
     prioritizes matching the standard textbook diagram over that property.
     """
-    f = np.asarray(f, dtype=float)
-    R = _prep_component(R, f, "R")
-    L = _prep_component(L, f, "L")
-    G = _prep_component(G, f, "G")
-    C = _prep_component(C, f, "C")
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    R = _prep_component(f, R, "R")
+    L = _prep_component(f, L, "L")
+    G = _prep_component(f, G, "G")
+    C = _prep_component(f, C, "C")
 
-    w = 2.0 * np.pi * f
-    Z = R + 1j * w * L
-    Y = G + 1j * w * C
+    Z = R + 1j*2*np.pi*f*L
+    Y = G + 1j*2*np.pi*f*C
 
-    Nf = f.size if f.ndim > 0 else 1
-    ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = 1.0 + Y * Z
-    ABCD[:, 0, 1] = Z
-    ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0
-
-    return Network2Port(f, ABCD_to_S(ABCD, Z0), Z0=Z0, schematic=SYM2P_RLGC)
+    return net2p_ZY(f, Z=Z, Y = Y, Z0=Z0, schematic=SYM2P_RLGC)
 
 
 
 def net2p_tline_series(f, f0, EL_deg, Zc, Z0=50.0):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Nf = f.size
     Z0_arr = _broadcast_array(Z0, 2)
     theta = np.radians(EL_deg) * (f / f0)
@@ -2604,7 +2542,7 @@ def net2p_tline_series(f, f0, EL_deg, Zc, Z0=50.0):
 
 
 def net2p_tline_shunt_open(f, f0, EL_deg, Zc, Z0=50.0):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Z0_arr = _broadcast_array(Z0, 2)
     theta = np.radians(EL_deg) * (f / f0)
     Y = np.tan(theta) / (-1j * Zc)
@@ -2612,47 +2550,14 @@ def net2p_tline_shunt_open(f, f0, EL_deg, Zc, Z0=50.0):
 
 
 def net2p_tline_shunt_short(f, f0, EL_deg, Zc, Z0=50.0):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Z0_arr = _broadcast_array(Z0, 2)
     theta = np.radians(EL_deg) * (f / f0)
     Y = 1.0 / (1j * Zc * np.tan(theta))
     return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_SHORT)
 
-
-def net1p_tline_open(f, f0, EL_deg, Zc, Z0=50.0):
-    """1-port network: ideal open-circuited transmission line stub."""
-    f = np.asarray(f, dtype=float)
-    Z0_val = float(np.atleast_1d(Z0).astype(float)[0])
-
-    theta = np.radians(EL_deg) * (f / f0)
-    Zin = -1j * Zc / np.tan(theta)
-    S11 = (Zin - Z0_val) / (Zin + Z0_val)
-
-    Nf = f.size if f.ndim > 0 else 1
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_OPEN)
-
-
-def net1p_tline_short(f, f0, EL_deg, Zc, Z0=50.0):
-    """1-port network: ideal short-circuited transmission line stub."""
-    f = np.asarray(f, dtype=float)
-    Z0_val = float(np.atleast_1d(Z0).astype(float)[0])
-
-    theta = np.radians(EL_deg) * (f / f0)
-    Zin = 1j * Zc * np.tan(theta)
-    S11 = (Zin - Z0_val) / (Zin + Z0_val)
-
-    Nf = f.size if f.ndim > 0 else 1
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_SHORT)
-
-
 def net2p_tline_lossy_series(f, gamma, length, Zc=50.0, Z0=50.0):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Nf = f.size
     Z0_arr = _broadcast_array(Z0, 2)
     gl = np.asarray(gamma) * length
@@ -2664,40 +2569,71 @@ def net2p_tline_lossy_series(f, gamma, length, Zc=50.0, Z0=50.0):
     return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=SYM2P_TLINE_SERIES)
 
 def net2p_tline_lossy_shunt_open(f, gamma, length, Zc=50.0, Z0=50.0):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Z0_arr = _broadcast_array(Z0, 2)
     gl = np.asarray(gamma) * length
     Y = np.tanh(gl) / Zc
     return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_OPEN)
 
 def net2p_tline_lossy_shunt_short(f, gamma, length, Zc=50.0, Z0=50.0):
-    f = np.asarray(f, dtype=float)
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     Z0_arr = _broadcast_array(Z0, 2)
     gl = np.asarray(gamma) * length
     Y = 1.0 / (Zc * np.tanh(gl))
     return net2p_ZY(f, Z=0.0, Y=Y, Z0=Z0_arr, schematic=SYM2P_TLINE_SHUNT_SHORT)
 
+def net1p_Z(f, Z, Z0=50.0, schematic=SYM1P_RLC):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    Z = _prep_component(f, Z, "Z")
+    Z0_val = float(np.atleast_1d(Z0).astype(float)[0])
+    S11 = (Z - Z0_val) / (Z + Z0_val)
+    return Network1Port(f, S11.reshape(-1, 1, 1), Z0=Z0_val, schematic=schematic)
+
+def net1p_R(f, R, Z0=50.0):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    R = _prep_component(f, R, "R")
+    return net1p_Z(f, Z=R, Z0=Z0, schematic=SYM1P_R)
+
+def net1p_L(f, L, Z0=50.0):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    L = _prep_component(f, L, "L")
+    return net1p_Z(f, Z=1j*2*np.pi*f*L, Z0=Z0, schematic=SYM1P_L)
+
+def net1p_C(f, C, Z0=50.0):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    C = _prep_component(f, C, "C")
+    return net1p_Z(f, Z=1/(1j*2*np.pi*f*C), Z0=Z0, schematic=SYM1P_C)
+
+def net1p_RLC(f, R, L, C, Z0=50.0):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    R = _prep_component(f, R, "R")
+    L = _prep_component(f, L, "L")
+    C = _prep_component(f, C, "C")
+    return net1p_Z(f, Z=R+1j*2*np.pi*f*L+ 1/(1j*2*np.pi*f*C), Z0=Z0, schematic=SYM1P_RLC)
+
+def net1p_tline_open(f, f0, EL_deg, Zc, Z0=50.0):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    theta = np.radians(EL_deg) * (f / f0)
+    Zin = -1j * Zc / np.tan(theta)
+    return net1p_Z(f, Z=Zin, Z0=Z0, schematic=SYM1P_TLINE_OPEN)
+
+def net1p_tline_short(f, f0, EL_deg, Zc, Z0=50.0):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    theta = np.radians(EL_deg) * (f / f0)
+    Zin = 1j * Zc * np.tan(theta)
+    return net1p_Z(f, Z=Zin, Z0=Z0, schematic=SYM1P_TLINE_SHORT)
+
 def net1p_tline_lossy_open(f, gamma, length, Zc=50.0, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    Nf = f.size
-    Z0_val = float(np.atleast_1d(Z0)[0])
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     gl = np.asarray(gamma) * length
     Zin = Zc / np.tanh(gl)
-    S11 = (Zin - Z0_val) / (Zin + Z0_val)
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_OPEN)
+    return net1p_Z(f, Z=Zin, Z0=Z0, schematic=SYM1P_TLINE_OPEN)
 
 def net1p_tline_lossy_short(f, gamma, length, Zc=50.0, Z0=50.0):
-    f = np.asarray(f, dtype=float)
-    Nf = f.size
-    Z0_val = float(np.atleast_1d(Z0)[0])
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     gl = np.asarray(gamma) * length
     Zin = Zc * np.tanh(gl)
-    S11 = (Zin - Z0_val) / (Zin + Z0_val)
-    S = np.zeros((Nf, 1, 1), dtype=complex)
-    S[:, 0, 0] = S11
-    return Network1Port(f, S, Z0=Z0_val, schematic=SYM1P_TLINE_SHORT)
+    return net1p_Z(f, Z=Zin, Z0=Z0, schematic=SYM1P_TLINE_SHORT)
 
 #================================================================
 # Important functions
