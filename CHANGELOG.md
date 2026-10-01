@@ -1,8 +1,16 @@
 # Changelog
 
-## [0.1.2] 
+## [0.1.2] - 2026-10-01
 ### Added
-- Plots for phase response and group delay
+- `net1p_Z` and `net2p_ZY` as backends for network functions
+- helper functions `ZY_to_propagation` and `RLGC_to_propagation` 
+- Lossy transmission line networks
+- Phase response and group delay plots
+
+### Changed
+- All series/shunt R, L, G, C 2-port functions now use `net2p_ZY` as backend
+- All 1-port R, L, C and tline functions now use `net1p_Z` as backend
+- `_prep_component` refactored: complex dtype, f-first argument order `(f, val, name)`
 
 ### Fixed
 - Time and frequency units autoscale. Units used to be hardcoded to GHz and ns
