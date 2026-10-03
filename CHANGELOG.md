@@ -8,13 +8,15 @@
 - Phase response and group delay plots
 
 ### Changed
-- All series/shunt R, L, G, C 2-port functions now use `net2p_ZY` as backend
+- All series/shunt R, L, C 2-port functions now use `net2p_ZY` as backend
 - All 1-port R, L, C and tline functions now use `net1p_Z` as backend
 - `_prep_component` refactored: complex dtype, f-first argument order `(f, val, name)`
 - `plot_time_domain` is renamed to `plot_ifft`
+- `check` and `check_network` now use Nports for explicit port-count validation; check_network now also requires strictly increasing frequencies
 
 ### Fixed
-- Time and frequency units autoscale. Units used to be hardcoded to GHz and ns
+- Time and frequency plot units now autoscale; units were previously hardcoded to ns and GHz
+- Fixed port-pair indexing for multi-port IFFT plots
 
 ## [0.1.1] - 2026-08-13
 ### Fixed
