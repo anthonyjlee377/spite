@@ -9,31 +9,31 @@ import os
 # Matrix format check and conversions
 #================================================================
 
-def check(S, n=None):
+def check(S, Nports=None):
     """
-    Checks if the input array matches the mandatory (Nf, N, N) shape.
-    Optionally enforces a specific number of ports 'n' (e.g., n=1 or n=2).
+    Checks if the input array matches the mandatory (Nf, Nports, Nports) shape.
+    Optionally enforces a specific number of ports 'Nports' (e.g., Nports=1 or Nports=2).
     """
     S = np.asarray(S, dtype=complex)
 
     # Check dimensions
     if S.ndim != 3:
-        raise ValueError(f"S-parameter array must be 3D with shape (Nf, N, N). Got {S.ndim}D shape: {S.shape}")
+        raise ValueError(f"S-parameter array must be 3D with shape (Nf, Nports, Nports). Got {S.ndim}D shape: {S.shape}")
 
     # Check if it's a square matrix per frequency point
     if S.shape[1] != S.shape[2]:
-        raise ValueError(f"S-parameter matrix must be square (Nf, N, N). Got shape: {S.shape}")
+        raise ValueError(f"S-parameter matrix must be square (Nf, Nports, Nports). Got shape: {S.shape}")
 
     # Check specific port count if requested
-    if n is not None and S.shape[1] != n:
-        raise ValueError(f"Expected a {n}-port network shape ({S.shape[0]}, {n}, {n}). Got: {S.shape}")
+    if Nports is not None and S.shape[1] != Nports:
+        raise ValueError(f"Expected a {Nports}-port network shape ({S.shape[0]}, {Nports}, {Nports}). Got: {S.shape}")
 
     return S
 
-def check_network(f, S, n=None):
+def check_network(f, S, Nports=None):
     """Validates both frequency vector and S-parameter matrix shapes together."""
     f = np.atleast_1d(np.asarray(f, dtype=float))
-    S = check(S, n)
+    S = check(S, Nports)
 
     if len(f) != S.shape[0]:
         raise ValueError(f"Frequency vector length ({len(f)}) must match S-parameter batch size ({S.shape[0]}).")
@@ -278,7 +278,7 @@ def Y_to_S(Y, Z0=50):
 
 def S_to_ABCD(S, Z0=50):
     """Converts a batch of 2-port S-parameters with shape (Nf, 2, 2) to ABCD parameters supporting multi-Z0 arrays."""
-    S = check(S, n=2)
+    S = check(S, Nports=2)
     Nf, N, _ = S.shape
 
     # Handle Z0 array conversion [Z01, Z02]
@@ -305,7 +305,7 @@ def S_to_ABCD(S, Z0=50):
 
 def ABCD_to_S(ABCD, Z0=50):
     """Converts a batch of 2-port ABCD parameters with shape (Nf, 2, 2) to S-parameters supporting multi-Z0 arrays."""
-    ABCD = check(ABCD, n=2)
+    ABCD = check(ABCD, Nports=2)
     Nf, N, _ = ABCD.shape
 
     # Handle Z0 array conversion [Z01, Z02]
@@ -2178,7 +2178,7 @@ class Network:
 class Network1Port(Network):
     def __init__(self, f, S, Z0=50, schematic=SYM1P_BLACKBOX):
         # Validate that this is explicitly a 1-port shape
-        f, S = check_network(f, S, n=1)
+        f, S = check_network(f, S, Nports=1)
         super().__init__(f, S, Z0, schematic)
 
 
@@ -2195,7 +2195,7 @@ class Network1Port(Network):
 class Network2Port(Network):
     def __init__(self, f, S, Z0=50, schematic=SYM2P_BLACKBOX):
         # Validate that this is explicitly a 2-port shape
-        f, S = check_network(f, S, n=2)
+        f, S = check_network(f, S, Nports=2)
         super().__init__(f, S, Z0, schematic)
 
     @property
