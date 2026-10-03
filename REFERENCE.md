@@ -10,7 +10,7 @@ Validates that `S` has the required `(Nf, Nports, Nports)` shape. If `n` is give
 
 #### `check_network(f, S, n=None)`
 Same validation as `check`, but also confirms `f` and `S` agree in length.
-- **f**: `(Nf,)`, array-like
+- **f**: scalar or `(Nf,)` array-like, frequency in Hz
 - **S**: `(Nf, Nports, Nports)`, complex array
 - **n**: `int`, required port count, optional
 - **returns**: `(f, S)`, unchanged, if valid
@@ -24,6 +24,13 @@ are only defined for 2-port networks.
 - **Z0**: reference impedance, float or array-like `(Nports,)`, default 50Ω
 - **returns**: the converted matrix, same shape as the input
 
+#### `ZY_to_propagation(f, Z, Y)` / `RLGC_to_propagation(f, R, L, G, C)`
+Convert per-unit-length series impedance and shunt admittance, or RLGC parameters, into the propagation constant and characteristic impedance.
+- **f**: scalar or `(Nf,)` array-like, frequency in Hz
+- **Z, Y**: scalar or array-like matching f, per-unit-length series impedance (Ω/m) and shunt admittance (S/m)
+- **R, L, G, C**: scalar or array-like matching f, per-unit-length resistance (Ω/m), inductance (H/m), conductance (S/m), and capacitance (F/m)
+- **returns**: `gamma`, `Zc`, where gamma is the complex propagation constant in 1/m and Zc is the complex characteristic impedance in Ω
+  
 ---
 
 ## Symbols and schematics
@@ -71,7 +78,7 @@ Resizes a bitmap array to a target pixel height, preserving aspect ratio.
 
 ## `Network(f, S, Z0=50, schematic=np.array([[0]]))`
 
-- **f**: `(Nf,)`, array-like, frequency in Hz
+- **f**: scalar or `(Nf,)` array-like, frequency in Hz
 - **S**: `(Nf, Nports, Nports)` complex array
 - **Z0**: reference impedance, float or array-like `(Nports,)`, default 50Ω
 - **schematic**: 2D array-like bitmap, shown by `plot_schematic()`
@@ -85,9 +92,11 @@ Resizes a bitmap array to a target pixel height, preserving aspect ratio.
 ### Plotting methods
 - **`plot_schematic(figsize=DEFAULT_FIGSIZE, cmap="gray")`**
 - **`plot_lin(param="S", port_indices=(1,1), cmap="plasma", ax=None)`** 
-- **`plot_dB(floor=-40, param="S", port_indices=(1,1), cmap="plasma", ax=None)`** 
-- **`plot_smith(port_indices=(1,1), chart_type="Z", cmap="plasma", ax=None)`** 
-`chart_type` is `"Z"` (impedance) or `"Y"` (admittance)
+- **`plot_dB(floor=-40, param="S", port_indices=(1,1), cmap="plasma", ax=None)`**
+- **`plot_phase(param="S", port_indices=(1, 1), deg=True, unwrap=False, cmap="plasma", ax=None)`**
+- **`plot_group_delay(port_indices=None, cmap="plasma", ax=None)`**
+- **`plot_smith(port_indices=(1,1), chart_type="Z", cmap="plasma", ax=None)`** : `chart_type` is `"Z"` (impedance) or `"Y"` (admittance)
+- **`plot_ifft(port_indices=(1,1), cmap="plasma_r", ax=None)`**
 
  `port_indices` accepts either a single `(i, j)` tuple or a list of tuples.
 
@@ -96,19 +105,19 @@ Resizes a bitmap array to a target pixel height, preserving aspect ratio.
   - **f_eval**: float or array-like, frequencies to evaluate at
   - **returns**: interpolated value(s), shape depends on `port_indices`
 
-- **`gate(t_start, t_stop, alpha=0.05, trim=True)`**: time-domain gate on S: IFFT -> zero outside `[t_start, t_stop]` seconds -> FFT back. Used to strip out delayed reflections.
+- **`gate(t_start, t_stop, alpha=0.05, trim=True)`**: applies a Tukey frequency window, IFFT, time gate over `[t_start, t_stop]`, then FFTs back
   - **returns**: a new `Network` with the gated result
 
 - **`write_touchstone(filepath)`**: saves this network to a Touchstone file (`.sNp`)
 
 ### `Network1Port(Network)`
--Adds shortcut properties: **`S11`**, **`Z11`**, **`Y11`** 
--Each shortcut property optionally takes `f_eval=None`.
+-Adds shortcut methods: **`S11`**, **`Z11`**, **`Y11`** 
+-Each method optionally takes `f_eval=None`.
 
 ### `Network2Port(Network)`
 -Adds the **`ABCD`** property (`S_to_ABCD(self.S, self.Z0)`), 
--Shortcut properties: Matrix entries for S, Z, and Y parameters such as **`S11`**, **`Z11`**, **`Y11`** etc.
--Each shortcut property optionally takes `f_eval=None`.
+-Shortcut methods: Matrix entries for S, Z, and Y parameters such as **`S11`**, **`Z11`**, **`Y11`** etc.
+-Each method optionally takes `f_eval=None`.
 
 ### Operators
 - **`@` (`__matmul__`)**
@@ -134,7 +143,7 @@ net2p_L_series(f, L, Z0=50.0), net2p_L_shunt(f, L, Z0=50.0), net1p_L(f, L, Z0=50
 net2p_C_series(f, C, Z0=50.0), net2p_C_shunt(f, C, Z0=50.0), net1p_C(f, C, Z0=50.0)
 ```
 Ideal series/shunt/termination R, L, or C elements.
-- **f**: `(Nf,)`, array-like, Hz
+- **f**: scalar or `(Nf,)` array-like, frequency in Hz
 - **R / L / C**: float or array-like matching `f`'s shape (ohms / henries / farads)
 - **Z0**: reference impedance, float or array-like `(Nports,)`, default 50Ω
 - **returns**: `Network2Port` (series/shunt) or `Network1Port` (termination)
@@ -155,17 +164,19 @@ Generic series impedance `Z` followed by shunt admittance `Y`.
 ## Transmission line components
 
 ```
-net2p_tline_series(f, f0, EL_deg, Zc, Z0=50.0),
-net2p_tline_shunt_open(f, f0, EL_deg, Zc, Z0=50.0),
-net2p_tline_shunt_short(f, f0, EL_deg, Zc, Z0=50.0),
-net1p_tline_open(f, f0, EL_deg, Zc, Z0=50.0),
-net1p_tline_short(f, f0, EL_deg, Zc, Z0=50.0)
+net2p_tline_series(f, f0, EL_deg, Zc, Z0=50.0), net2p_tline_lossy_series(f, gamma, length, Zc=50.0, Z0=50.0),
+net2p_tline_shunt_open(f, f0, EL_deg, Zc, Z0=50.0), net2p_tline_lossy_shunt_open(f, gamma, length, Zc=50.0, Z0=50.0),
+net2p_tline_shunt_short(f, f0, EL_deg, Zc, Z0=50.0), net2p_tline_lossy_shunt_short(f, gamma, length, Zc=50.0, Z0=50.0),
+net1p_tline_open(f, f0, EL_deg, Zc, Z0=50.0), net1p_tline_lossy_open(f, gamma, length, Zc=50.0, Z0=50.0),
+net1p_tline_short(f, f0, EL_deg, Zc, Z0=50.0), net1p_tline_lossy_short(f, gamma, length, Zc=50.0, Z0=50.0)
 ```
-Ideal transmission-line segment.
-- **f**: `(Nf,)` array-like, Hz
+
+- **f**: scalar or `(Nf,)` array-like, frequency in Hz
 - **f0**: `float`, the frequency at which `EL_deg` is defined
 - **EL_deg**: `float`, electrical length in degrees, at `f0`
-- **Zc**: `float`, characteristic impedance of the line, ohms
+- **gamma**: `complex` or array-like with respect to `f`, propagation constant in 1/m
+- **length**: `float`, physical length of a lossy line, meters
+- **Zc**: `complex` or array-like with respect to `f`, characteristic impedance of the line, ohms
 - **Z0**: reference impedance, float or array-like `(Nports,)`, default 50Ω
 - **returns**: `Network2Port` (series/shunt-loaded through-line) or `Network1Port` (bare stub)
 
