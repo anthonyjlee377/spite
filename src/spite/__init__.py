@@ -37,6 +37,8 @@ def check_network(f, S, n=None):
 
     if len(f) != S.shape[0]:
         raise ValueError(f"Frequency vector length ({len(f)}) must match S-parameter batch size ({S.shape[0]}).")
+    if len(f) > 1 and not np.all(np.diff(f) > 0):
+        raise ValueError("Frequency vector must be strictly increasing.")
 
     return f, S
 
@@ -1823,7 +1825,7 @@ class Network:
         param = "S" # group delay is obtained from S parameters
         if port_indices is None:
             port_indices = (2, 1) if self.Nports >= 2 else (1, 1)
-            
+
         ports, is_raw_tuple = self._parse_ports(port_indices)
         f_div, f_unit = self._freq_unit()
 
@@ -1836,9 +1838,9 @@ class Network:
             omega = 2 * np.pi * f
             # numerical derivative: use central differences for interior points
             gd = -np.gradient(phase_rad, omega)  # seconds
-            return gd  
+            return gd
 
-        
+
 
         if is_raw_tuple:
             p = ports[0]
@@ -2060,8 +2062,10 @@ class Network:
         return w
 
     def _time_axis(self):
-        """Shared time-axis construction for gate() and plot_time_domain().
+        """Shared time-axis construction for gate() and plot_ifft().
         Requires uniformly spaced frequency samples."""
+        if len(self.f) < 2:
+            raise ValueError("Time-domain operations require at least two frequency points.")
         df = np.diff(self.f)
         if not np.allclose(df, df[0], rtol=1e-6):
             raise ValueError("This operation requires uniformly spaced frequency samples.")
@@ -2104,9 +2108,13 @@ class Network:
 
 
 
-    def plot_time_domain(self, port_indices=(1, 1), cmap="plasma_r", ax=None):
-        """Plots the time-domain impulse response (|IFFT(S)|) for one or more port pairs.
-        Useful for visually identifying reflections before calling gate()."""
+    def plot_ifft(self, port_indices=(1, 1), cmap="plasma_r", ax=None):
+        """Plots |IFFT(Sij)| for one or more port pairs.
+
+        The stored S-parameter samples are transformed directly without
+        frequency-domain windowing or other preprocessing. Frequency samples
+        must be uniformly spaced.
+        """
         ports, is_raw_tuple = self._parse_ports(port_indices)
 
         if ax is None:
@@ -2130,8 +2138,8 @@ class Network:
                 c = color_map(norm(t[k] / t_div))
                 ax.plot(t_scaled[k:k+2], mag[k:k+2], color=c, lw=2)
 
-            ax.set_ylabel(f"|{label}| (Impulse Response)")
-            ax.set_title(f"Time-Domain Response of {label}")
+            ax.set_ylabel(f"|IFFT({label})|")
+            ax.set_title(f"IFFT Magnitude of {label}")
 
             # Time Colorbar
             #sm = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
@@ -2142,15 +2150,15 @@ class Network:
         else:
             # --- 2. ARRAY OF PORTS [(1,1), ...] -> STATIC COLORS ---
             for idx, p in enumerate(ports):
-                i, j = ports[0][0] - 1, ports[0][1] - 1
+                i, j = p[0] - 1, p[1] - 1 # bug fix
                 s_t = np.fft.ifft(self.S[:, i, j])
-                label = f"$S_{{{ports[0][0]}{ports[0][1]}}}$"
+                label = f"$S_{{{p[0]}{p[1]}}}$"
                 mag = np.abs(s_t)
 
                 ax.plot(t / t_div, mag, color=STATIC_COLORS[idx], lw=2, label=label)
 
-            ax.set_ylabel("|Impulse Response|")
-            ax.set_title("Time-Domain Response")
+            ax.set_ylabel("|IFFT(S)|")
+            ax.set_title("IFFT Magnitude")
             ax.legend(loc="upper right", frameon=True)
 
         ax.set_xlabel(f"Time ({t_unit})")
@@ -2468,7 +2476,7 @@ def net2p_ZY(f, Z, Y, Z0=50.0, schematic=SYM2P_RLGC):
     ABCD[:, 0, 0] = 1.0 + Y * Z
     ABCD[:, 0, 1] = Z
     ABCD[:, 1, 0] = Y
-    ABCD[:, 1, 1] = 1.0 
+    ABCD[:, 1, 1] = 1.0
     return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=schematic)
 
 
@@ -2536,8 +2544,10 @@ def net2p_tline_series(f, f0, EL_deg, Zc, Z0=50.0):
     Z0_arr = _broadcast_array(Z0, 2)
     theta = np.radians(EL_deg) * (f / f0)
     ABCD = np.zeros((Nf, 2, 2), dtype=complex)
-    ABCD[:, 0, 0] = np.cos(theta); ABCD[:, 0, 1] = 1j * Zc * np.sin(theta)
-    ABCD[:, 1, 0] = 1j * np.sin(theta) / Zc; ABCD[:, 1, 1] = np.cos(theta)
+    ABCD[:, 0, 0] = np.cos(theta) 
+    ABCD[:, 0, 1] = 1j * Zc * np.sin(theta)
+    ABCD[:, 1, 0] = 1j * np.sin(theta) / Zc 
+    ABCD[:, 1, 1] = np.cos(theta)
     return Network2Port(f, ABCD_to_S(ABCD, Z0_arr), Z0=Z0_arr, schematic=SYM2P_TLINE_SERIES)
 
 
