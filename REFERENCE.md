@@ -2,17 +2,17 @@
 
 ## Matrix format checks and conversions
 
-#### `check(S, n=None)`
-Validates that `S` has the required `(Nf, Nports, Nports)` shape. If `n` is given, also enforces that exact port count.
+#### `check(S, Nports=None)`
+Validates that `S` has the required `(Nf, Nports, Nports)` shape. If `Nports` is given, also enforces that exact port count.
 - **S**: `(Nf, Nports, Nports)`, complex array
-- **n**: `int`, required port count, optional
+- **Nports**: `int`, required port count, optional
 - **returns**: `S`, unchanged, if valid; raises `ValueError` otherwise
 
-#### `check_network(f, S, n=None)`
+#### `check_network(f, S, Nports=None)`
 Same validation as `check`, but also confirms `f` and `S` agree in length.
 - **f**: scalar or `(Nf,)` array-like, frequency in Hz
 - **S**: `(Nf, Nports, Nports)`, complex array
-- **n**: `int`, required port count, optional
+- **Nports**: `int`, required port count, optional
 - **returns**: `(f, S)`, unchanged, if valid
 
 #### `S_to_Z(S, Z0=50)` / `Z_to_S(Z, Z0=50)`
