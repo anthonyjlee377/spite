@@ -43,22 +43,23 @@ def check_network(f, S, n=None):
     return f, S
 
 
-def ZY_to_propagation(Z, Y):
-    Z = np.asarray(Z, dtype=complex)
-    Y = np.asarray(Y, dtype=complex)
+def ZY_to_propagation(f, Z, Y):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
+    Z = _prep_component(f, Z, "Z")
+    Y = _prep_component(f, Y, "Y")
     gamma = np.sqrt(Z * Y)
     Zc = np.sqrt(Z / Y)
     return gamma, Zc
 
-def RLGC_to_propagation(R, L, G, C, f):
-    f = np.asarray(f, dtype=float)
+def RLGC_to_propagation(f, R, L, G, C):
+    f = np.atleast_1d(np.asarray(f, dtype=float))
     R = _prep_component(f, R, "R")
     L = _prep_component(f, L, "L")
-    G = _prep_component( f, G,"G")
+    G = _prep_component(f, G, "G")
     C = _prep_component(f, C, "C")
     Z = R + 1j * 2 * np.pi * f * L
     Y = G + 1j * 2 * np.pi * f * C
-    return ZY_to_propagation(Z, Y)
+    return ZY_to_propagation(f, Z, Y)
 
 
 def _broadcast_array(val, N):
