@@ -50,7 +50,7 @@ SPITE depends on NumPy and Matplotlib. Nothing else.
 pip install spite
 ```
 
-In a notebooke environment, run the following cell to install SPITE:
+In a notebook environment, run the following cell to install SPITE:
 
 ```bash
 !pip install spite -q  # -q is optional
@@ -137,7 +137,7 @@ A bibtex is provided below for those who would like to use it:
   title   = {SPITE: Scattering Parameter Inspection Tool for Engineers},
   year    = {2026},
   url     = {https://github.com/anthonyjlee377/spite},
-  version = {0.1.1}
+  version = {0.1.2}
 }
 ```
 
