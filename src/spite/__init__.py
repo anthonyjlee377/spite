@@ -946,7 +946,7 @@ EEEEEEEEEEEEEEEE................
 """)
 
 SYM2P_RLGC = np.hstack([SYM2P_R_SERIES, SYM2P_L_SERIES, SYM2P_R_SHUNT, SYM2P_C_SHUNT])
-SYM1P_RLC = np.hstack([SYM2P_R_SERIES, SYM2P_L_SERIES, SYM2P_C_SHUNT])
+SYM1P_RLC = np.hstack([SYM2P_R_SERIES, SYM2P_L_SERIES, SYM1P_C_SHUNT])
 
 SYM2P_TLINE_SERIES = make_bitmap("""
 ........................................
